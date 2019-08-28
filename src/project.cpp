@@ -1591,9 +1591,9 @@ void Project::loadEventPixmaps(QList<Event*> objects) {
             
             QString info_label = pointerHash[object->get("sprite")].replace("&", "");
             QStringList gfx_info = parser.readCArray("src/data/field_event_obj/event_object_graphics_info.h", info_label);
-            QString pic_label = gfx_info.value(14);
-            QString dimensions_label = gfx_info.value(11);
-            QString subsprites_label = gfx_info.value(12);
+            QString pic_label = gfx_info.value(15);
+            QString dimensions_label = gfx_info.value(12);
+            QString subsprites_label = gfx_info.value(13);
             QString gfx_label = parser.readCArray("src/data/field_event_obj/event_object_pic_tables.h", pic_label).value(0);
             gfx_label = gfx_label.section(QRegExp("[\\(\\)]"), 1, 1);
             QString path = parser.readCIncbin("src/data/field_event_obj/event_object_graphics.h", gfx_label);
