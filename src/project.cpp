@@ -794,9 +794,9 @@ void Project::saveMap(Map *map) {
             logError(QString("Error: failed to create directory for new map: '%1'").arg(mapDataDir));
         }
 
-        // Create file data/maps/<map_name>/scripts.inc
-        QString text = QString("%1_MapScripts::\n\t.byte 0\n").arg(map->name);
-        saveTextFile(root + "/data/maps/" + map->name + "/scripts.inc", text);
+        // Create file data/maps/<map_name>/scripts.pory
+        QString text = QString("raw `\n%1_MapScripts::\n\t.byte 0\n`\n").arg(map->name);
+        saveTextFile(root + "/data/maps/" + map->name + "/scripts.pory", text);
 
         if (projectConfig.getBaseGameVersion() == BaseGameVersion::pokeruby) {
             // Create file data/maps/<map_name>/text.inc

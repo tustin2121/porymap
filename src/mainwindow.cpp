@@ -1046,8 +1046,11 @@ void MainWindow::redo() {
 
 // Open current map scripts in system default editor for .inc files
 void MainWindow::openInTextEditor() {
-    QString path = QDir::cleanPath("file://" + editor->project->root + QDir::separator() + "data/maps/" + editor->map->name + "/scripts.inc");
-    QDesktopServices::openUrl(QUrl(path));
+    QString path = QDir::cleanPath("file://" + editor->project->root + QDir::separator() + "data/maps/" + editor->map->name + "/scripts.pory");
+    if (!QDesktopServices::openUrl(QUrl(path))) {
+        QString path = QDir::cleanPath("file://" + editor->project->root + QDir::separator() + "data/maps/" + editor->map->name + "/scripts.inc");
+        QDesktopServices::openUrl(QUrl(path));
+    }
 }
 
 void MainWindow::on_action_Save_triggered() {
