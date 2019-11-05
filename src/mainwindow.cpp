@@ -1415,6 +1415,7 @@ void MainWindow::updateSelectedObjects() {
                 combo->addItem("NORMAL", "1");
                 combo->addItem("SEE ALL DIRECTIONS", "3");
                 combo->addItem("BUMP TO INTERACT", "5");
+                combo->addItem("KEEP LOADED", "6");
                 combo->setToolTip("The trainer type of this event object.\n"
                                   "If it is not a trainer, use NONE. SEE ALL DIRECTIONS\n"
                                   "should only be used with a sight radius of 1.");
