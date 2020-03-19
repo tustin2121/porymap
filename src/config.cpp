@@ -96,7 +96,7 @@ QString PorymapConfig::getConfigFilepath() {
     if (!dir.exists())
         dir.mkpath(settingsPath);
 
-    QString configPath = dir.absoluteFilePath("porymap.cfg");
+    QString configPath = dir.absoluteFilePath("porymap-tth.cfg");
 
     return configPath;
 }
