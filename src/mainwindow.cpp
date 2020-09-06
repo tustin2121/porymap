@@ -1720,30 +1720,28 @@ void MainWindow::updateSelectedObjects() {
             NoScrollComboBox *combo;
             QCheckBox *check;
 
-<<<<<<< HEAD
-            // trainer_type has custom values, so it has special signal logic.
-            if (key == "trainer_type") {
-                combo->setEditable(false);
-                combo->addItem("NONE", "0");
-                combo->addItem("NORMAL", "1");
-                combo->addItem("SEE ALL DIRECTIONS", "3");
-                combo->addItem("BUMP TO INTERACT", "5");
-                combo->addItem("KEEP LOADED", "6");
-                combo->setToolTip("The trainer type of this event object.\n"
-                                  "If it is not a trainer, use NONE. SEE ALL DIRECTIONS\n"
-                                  "should only be used with a sight radius of 1.");
+            // // trainer_type has custom values, so it has special signal logic.
+            // if (key == "trainer_type") {
+            //     combo->setEditable(false);
+            //     combo->addItem("NONE", "0");
+            //     combo->addItem("NORMAL", "1");
+            //     combo->addItem("SEE ALL DIRECTIONS", "3");
+            //     combo->addItem("BUMP TO INTERACT", "5");
+            //     combo->addItem("KEEP LOADED", "6");
+            //     combo->setToolTip("The trainer type of this event object.\n"
+            //                       "If it is not a trainer, use NONE. SEE ALL DIRECTIONS\n"
+            //                       "should only be used with a sight radius of 1.");
 
-                int index = combo->findData(value);
-                if (index != -1) {
-                    combo->setCurrentIndex(index);
-                }
+            //     int index = combo->findData(value);
+            //     if (index != -1) {
+            //         combo->setCurrentIndex(index);
+            //     }
 
-                fl->addRow(new QLabel(field_labels[key], widget), combo);
-                widget->setLayout(fl);
-                frame->layout()->addWidget(widget);
-                item->bindToUserData(combo, key);
-                continue;
-=======
+            //     fl->addRow(new QLabel(field_labels[key], widget), combo);
+            //     widget->setLayout(fl);
+            //     frame->layout()->addWidget(widget);
+            //     item->bindToUserData(combo, key);
+            //     continue;
             if (spinKeys.contains(key)) {
                 spin = new NoScrollSpinBox(widget);
             } else if (checkKeys.contains(key)) {
@@ -1751,7 +1749,6 @@ void MainWindow::updateSelectedObjects() {
             } else {
                 combo = new NoScrollComboBox(widget);
                 combo->setEditable(true);
->>>>>>> acc6da4c589a53ad4efe22eea32eced51c480593
             }
 
             if (key == "destination_map_name") {
