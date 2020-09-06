@@ -1,12 +1,14 @@
 #include "mappixmapitem.h"
 #include "log.h"
 
+#include "editcommands.h"
+
 #define SWAP(a, b) do { if (a != b) { a ^= b; b ^= a; a ^= b; } } while (0)
 
 void MapPixmapItem::paint(QGraphicsSceneMouseEvent *event) {
     if (map) {
         if (event->type() == QEvent::GraphicsSceneMouseRelease) {
-            map->commit();
+            actionId_++;
         } else {
             QPointF pos = event->pos();
             int x = static_cast<int>(pos.x()) / 16;
@@ -21,15 +23,13 @@ void MapPixmapItem::paint(QGraphicsSceneMouseEvent *event) {
                 paintNormal(x, y);
             }
         }
-
-        draw();
     }
 }
 
 void MapPixmapItem::shift(QGraphicsSceneMouseEvent *event) {
     if (map) {
         if (event->type() == QEvent::GraphicsSceneMouseRelease) {
-            map->commit();
+            actionId_++;
         } else {
             QPointF pos = event->pos();
             int x = static_cast<int>(pos.x()) / 16;
@@ -52,7 +52,7 @@ void MapPixmapItem::shift(QGraphicsSceneMouseEvent *event) {
     }
 }
 
-void MapPixmapItem::shift(int xDelta, int yDelta) {
+void MapPixmapItem::shift(int xDelta, int yDelta, bool fromScriptCall) {
     Blockdata *backupBlockdata = map->layout->blockdata->copy();
     for (int i = 0; i < map->getWidth(); i++)
     for (int j = 0; j < map->getHeight(); j++) {
@@ -70,7 +70,17 @@ void MapPixmapItem::shift(int xDelta, int yDelta) {
         map->setBlock(destX, destY, srcBlock);
     }
 
-    delete backupBlockdata;
+    if (!fromScriptCall) {
+        Blockdata *newMetatiles = map->layout->blockdata->copy();
+        if (newMetatiles->equals(backupBlockdata)) {
+            delete newMetatiles;
+            delete backupBlockdata;
+        } else {
+            map->editHistory.push(new ShiftMetatiles(map, backupBlockdata, newMetatiles, actionId_));
+        }
+    } else {
+        delete backupBlockdata;
+    }
 }
 
 void MapPixmapItem::paintNormal(int x, int y, bool fromScriptCall) {
@@ -90,6 +100,10 @@ void MapPixmapItem::paintNormal(int x, int y, bool fromScriptCall) {
     x = initialX + (xDiff / selectionDimensions.x()) * selectionDimensions.x();
     y = initialY + (yDiff / selectionDimensions.y()) * selectionDimensions.y();
 
+    // for edit history
+    Blockdata *oldMetatiles = nullptr;
+    if (!fromScriptCall) oldMetatiles = map->layout->blockdata->copy();
+
     for (int i = 0; i < selectionDimensions.x() && i + x < map->getWidth(); i++)
     for (int j = 0; j < selectionDimensions.y() && j + y < map->getHeight(); j++) {
         int actualX = i + x;
@@ -103,6 +117,16 @@ void MapPixmapItem::paintNormal(int x, int y, bool fromScriptCall) {
                 block->elevation = selectedCollisions->at(index).second;
             }
             map->setBlock(actualX, actualY, *block, !fromScriptCall);
+        }
+    }
+
+    if (!fromScriptCall) {
+        Blockdata *newMetatiles = map->layout->blockdata->copy();
+        if (newMetatiles->equals(oldMetatiles)) {
+            delete newMetatiles;
+            delete oldMetatiles;
+        } else {
+            map->editHistory.push(new PaintMetatile(map, oldMetatiles, newMetatiles, actionId_));
         }
     }
 }
@@ -149,6 +173,10 @@ void MapPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
         openTileElevation = selectedCollisions->at(4).second;
         setCollisions = true;
     }
+
+    // for edit history
+    Blockdata *oldMetatiles = nullptr;
+    if (!fromScriptCall) oldMetatiles = map->layout->blockdata->copy();
 
     // Fill the region with the open tile.
     for (int i = 0; i <= 1; i++)
@@ -211,6 +239,16 @@ void MapPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
         }
         map->setBlock(actualX, actualY, *block, !fromScriptCall);
     }
+
+    if (!fromScriptCall) {
+        Blockdata *newMetatiles = map->layout->blockdata->copy();
+        if (newMetatiles->equals(oldMetatiles)) {
+            delete newMetatiles;
+            delete oldMetatiles;
+        } else {
+            map->editHistory.push(new PaintMetatile(map, oldMetatiles, newMetatiles, actionId_));
+        }
+    }
 }
 
 void MapPixmapItem::updateMetatileSelection(QGraphicsSceneMouseEvent *event) {
@@ -263,7 +301,7 @@ void MapPixmapItem::updateMetatileSelection(QGraphicsSceneMouseEvent *event) {
 void MapPixmapItem::floodFill(QGraphicsSceneMouseEvent *event) {
     if (map) {
         if (event->type() == QEvent::GraphicsSceneMouseRelease) {
-            map->commit();
+            actionId_++;
         } else {
             QPointF pos = event->pos();
             int x = static_cast<int>(pos.x()) / 16;
@@ -280,23 +318,19 @@ void MapPixmapItem::floodFill(QGraphicsSceneMouseEvent *event) {
                     this->floodFill(x, y);
             }
         }
-
-        draw();
     }
 }
 
 void MapPixmapItem::magicFill(QGraphicsSceneMouseEvent *event) {
     if (map) {
         if (event->type() == QEvent::GraphicsSceneMouseRelease) {
-            map->commit();
+            actionId_++;
         } else {
             QPointF pos = event->pos();
             int initialX = static_cast<int>(pos.x()) / 16;
             int initialY = static_cast<int>(pos.y()) / 16;
             this->magicFill(initialX, initialY);
         }
-
-        draw();
     }
 }
 
@@ -327,6 +361,9 @@ void MapPixmapItem::magicFill(
             return;
         }
 
+        Blockdata *oldMetatiles = nullptr;
+        if (!fromScriptCall) oldMetatiles = map->layout->blockdata->copy();
+
         bool setCollisions = selectedCollisions && selectedCollisions->length() == selectedMetatiles->length();
         uint16_t tile = block->tile;
         for (int y = 0; y < map->getHeight(); y++) {
@@ -347,6 +384,16 @@ void MapPixmapItem::magicFill(
                     }
                     map->setBlock(x, y, *block, !fromScriptCall);
                 }
+            }
+        }
+
+        if (!fromScriptCall) {
+            Blockdata *newMetatiles = map->layout->blockdata->copy();
+            if (newMetatiles->equals(oldMetatiles)) {
+                delete newMetatiles;
+                delete oldMetatiles;
+            } else {
+                map->editHistory.push(new MagicFillMetatile(map, oldMetatiles, newMetatiles, actionId_));
             }
         }
     }
@@ -378,6 +425,9 @@ void MapPixmapItem::floodFill(
     bool *visited = new bool[numMetatiles];
     for (int i = 0; i < numMetatiles; i++)
         visited[i] = false;
+
+    Blockdata *oldMetatiles = nullptr;
+    if (!fromScriptCall) oldMetatiles = map->layout->blockdata->copy();
 
     QList<QPoint> todo;
     todo.append(QPoint(initialX, initialY));
@@ -427,6 +477,16 @@ void MapPixmapItem::floodFill(
         }
     }
 
+    if (!fromScriptCall) {
+        Blockdata *newMetatiles = map->layout->blockdata->copy();
+        if (newMetatiles->equals(oldMetatiles)) {
+            delete newMetatiles;
+            delete oldMetatiles;
+        } else {
+            map->editHistory.push(new BucketFillMetatile(map, oldMetatiles, newMetatiles, actionId_));
+        }
+    }
+
     delete[] visited;
 }
 
@@ -448,6 +508,9 @@ void MapPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromScri
         openTileElevation = selectedCollisions->at(4).second;
         setCollisions = true;
     }
+
+    Blockdata *oldMetatiles = nullptr;
+    if (!fromScriptCall) oldMetatiles = map->layout->blockdata->copy();
 
     // Flood fill the region with the open tile.
     QList<QPoint> todo;
@@ -548,6 +611,16 @@ void MapPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromScri
         }
     }
 
+    if (!fromScriptCall) {
+        Blockdata *newMetatiles = map->layout->blockdata->copy();
+        if (newMetatiles->equals(oldMetatiles)) {
+            delete newMetatiles;
+            delete oldMetatiles;
+        } else {
+            map->editHistory.push(new BucketFillMetatile(map, oldMetatiles, newMetatiles, actionId_));
+        }    
+    }
+
     delete[] visited;
 }
 
@@ -595,6 +668,7 @@ void MapPixmapItem::select(QGraphicsSceneMouseEvent *event) {
 
 void MapPixmapItem::draw(bool ignoreCache) {
     if (map) {
+        map->setMapItem(this);
         setPixmap(map->render(ignoreCache));
     }
 }

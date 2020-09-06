@@ -1,7 +1,6 @@
 #include "project.h"
 #include "config.h"
 #include "history.h"
-#include "historyitem.h"
 #include "log.h"
 #include "parseutil.h"
 #include "paletteutil.h"
@@ -170,8 +169,6 @@ Map* Project::loadMap(QString map_name) {
     if (!(loadMapData(map) && loadMapLayout(map)))
         return nullptr;
 
-    map->commit();
-    map->metatileHistory.save();
     mapCache->insert(map_name, map);
     return map;
 }
@@ -1120,7 +1117,7 @@ void Project::saveTilesetPalettes(Tileset *tileset) {
 }
 
 bool Project::loadMapTilesets(Map* map) {
-    if (map->layout->has_unsaved_changes) {
+    if (map->hasUnsavedChanges()) {
         return true;
     }
 
@@ -1179,13 +1176,19 @@ Tileset* Project::loadTileset(QString label, Tileset *tileset) {
     return tileset;
 }
 
-bool Project::loadBlockdata(Map* map) {
-    if (!map->isPersistedToFile || map->layout->has_unsaved_changes) {
+bool Project::loadBlockdata(Map *map) {
+    if (map->hasUnsavedChanges()) {
         return true;
     }
 
     QString path = QString("%1/%2").arg(root).arg(map->layout->blockdata_path);
     map->layout->blockdata = readBlockdata(path);
+    if (map->layout->lastCommitMapBlocks.blocks) {
+        delete map->layout->lastCommitMapBlocks.blocks;
+    }
+    map->layout->lastCommitMapBlocks.blocks = new Blockdata;
+    map->layout->lastCommitMapBlocks.blocks->copyFrom(map->layout->blockdata);
+    map->layout->lastCommitMapBlocks.dimensions = QSize(map->getWidth(), map->getHeight());
 
     if (map->layout->blockdata->blocks->count() != map->getWidth() * map->getHeight()) {
         logWarn(QString("Layout blockdata length %1 does not match dimensions %2x%3 (should be %4). Resizing blockdata.")
@@ -1198,16 +1201,19 @@ bool Project::loadBlockdata(Map* map) {
     return true;
 }
 
-void Project::setNewMapBlockdata(Map* map) {
+void Project::setNewMapBlockdata(Map *map) {
     Blockdata *blockdata = new Blockdata;
     for (int i = 0; i < map->getWidth() * map->getHeight(); i++) {
         blockdata->addBlock(qint16(0x3001));
     }
     map->layout->blockdata = blockdata;
+    map->layout->lastCommitMapBlocks.blocks = new Blockdata;
+    map->layout->lastCommitMapBlocks.blocks->copyFrom(map->layout->blockdata);
+    map->layout->lastCommitMapBlocks.dimensions = QSize(map->getWidth(), map->getHeight());
 }
 
 bool Project::loadMapBorder(Map *map) {
-    if (!map->isPersistedToFile || map->layout->has_unsaved_changes) {
+    if (map->hasUnsavedChanges()) {
         return true;
     }
 
@@ -1251,7 +1257,6 @@ void Project::saveLayoutBorder(Map *map) {
 void Project::saveLayoutBlockdata(Map* map) {
     QString path = QString("%1/%2").arg(root).arg(map->layout->blockdata_path);
     writeBlockdata(path, map->layout->blockdata);
-    map->metatileHistory.save();
 }
 
 void Project::writeBlockdata(QString path, Blockdata *blockdata) {
@@ -1461,7 +1466,7 @@ void Project::saveMap(Map *map) {
     updateMapLayout(map);
 
     map->isPersistedToFile = true;
-    map->layout->has_unsaved_changes = false;
+    map->editHistory.setClean();
 }
 
 void Project::updateMapLayout(Map* map) {
@@ -1552,10 +1557,10 @@ void Project::loadTilesetAssets(Tileset* tileset) {
         QString path = tileset->palettePaths.value(i);
         QString text = parser.readTextFile(path);
         if (!text.isNull()) {
-            QStringList lines = text.split(QRegExp("[\r\n]"),QString::SkipEmptyParts);
+            QStringList lines = text.split(QRegExp("[\r\n]"), Qt::SkipEmptyParts);
             if (lines.length() == 19 && lines[0] == "JASC-PAL" && lines[1] == "0100" && lines[2] == "16") {
                 for (int j = 0; j < 16; j++) {
-                    QStringList rgb = lines[j + 3].split(QRegExp(" "), QString::SkipEmptyParts);
+                    QStringList rgb = lines[j + 3].split(QRegExp(" "), Qt::SkipEmptyParts);
                     if (rgb.length() != 3) {
                         logWarn(QString("Invalid tileset palette RGB value: '%1'").arg(lines[j + 3]));
                         palette.append(qRgb((j - 3) * 16, (j - 3) * 16, (j - 3) * 16));
@@ -1897,8 +1902,6 @@ Map* Project::addNewMapToGroup(QString mapName, int groupNum) {
     setNewMapBorder(map);
     setNewMapEvents(map);
     setNewMapConnections(map);
-    map->commit();
-    map->metatileHistory.save();
     mapCache->insert(mapName, map);
 
     return map;
@@ -1927,9 +1930,6 @@ Map* Project::addNewMapToGroup(QString mapName, int groupNum, Map *newMap, bool 
     loadMapTilesets(map);
     setNewMapEvents(map);
     setNewMapConnections(map);
-
-    map->commit();
-    map->metatileHistory.save();
 
     return map;
 }

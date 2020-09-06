@@ -20,6 +20,7 @@ public:
     };
     MapPixmapItem(Map *map_, MetatileSelector *metatileSelector, Settings *settings) {
         this->map = map_;
+        this->map->setMapItem(this);
         this->metatileSelector = metatileSelector;
         this->settings = settings;
         this->paintingMode = PaintMode::Metatiles;
@@ -59,7 +60,7 @@ public:
     virtual void pick(QGraphicsSceneMouseEvent*);
     virtual void select(QGraphicsSceneMouseEvent*);
     virtual void shift(QGraphicsSceneMouseEvent*);
-    void shift(int xDelta, int yDelta);
+    void shift(int xDelta, int yDelta, bool fromScriptCall = false);
     virtual void draw(bool ignoreCache = false);
     void updateMetatileSelection(QGraphicsSceneMouseEvent *event);
     void paintNormal(int x, int y, bool fromScriptCall = false);
@@ -67,6 +68,8 @@ public:
 private:
     void paintSmartPath(int x, int y, bool fromScriptCall = false);
     static QList<int> smartPathTable;
+
+    unsigned actionId_ = 0;
 
 signals:
     void startPaint(QGraphicsSceneMouseEvent *, MapPixmapItem *);

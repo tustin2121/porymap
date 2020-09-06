@@ -121,8 +121,6 @@ private slots:
     void on_action_Save_Project_triggered();
     void openWarpMap(QString map_name, QString warp_num);
 
-    void undo();
-    void redo();
     void duplicate();
 
     void openInTextEditor();
@@ -156,9 +154,6 @@ private slots:
     void on_actionUse_Poryscript_triggered(bool checked);
 
     void on_mainTabBar_tabBarClicked(int index);
-
-    void on_actionUndo_triggered();
-    void on_actionRedo_triggered();
 
     void on_actionZoom_In_triggered();
     void on_actionZoom_Out_triggered();
@@ -252,6 +247,9 @@ private:
     QIcon* mapEditedIcon;
     QIcon* mapOpenedIcon;
 
+    QAction *undoAction;
+    QAction *redoAction;
+
     QWidget *eventTabObjectWidget;
     QWidget *eventTabWarpWidget;
     QWidget *eventTabTriggerWidget;
@@ -292,6 +290,8 @@ private:
     void checkToolButtons();
     void clickToolButtonFromEditMode(QString editMode);
 
+    void showWindowTitle();
+
     void initWindow();
     void initCustomUI();
     void initExtraShortcuts();
@@ -308,6 +308,7 @@ private:
     void updateTilesetEditor();
     QString getEventGroupFromTabWidget(QWidget *tab);
     void closeSupplementaryWindows();
+    void setWindowDisabled(bool);
 
     bool isProjectOpen();
     void showExportMapImageWindow(bool stitchMode);

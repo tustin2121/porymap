@@ -23,14 +23,17 @@ public:
     QString tileset_secondary_label;
     Tileset *tileset_primary = nullptr;
     Tileset *tileset_secondary = nullptr;
-    Blockdata* blockdata = nullptr;
+    Blockdata *blockdata = nullptr;
     QImage border_image;
     QPixmap border_pixmap;
     Blockdata *border = nullptr;
     Blockdata *cached_blockdata = nullptr;
     Blockdata *cached_collision = nullptr;
     Blockdata *cached_border = nullptr;
-    bool has_unsaved_changes = false;
+    struct {
+        Blockdata *blocks = nullptr;
+        QSize dimensions;
+    } lastCommitMapBlocks; // to track map changes
 };
 
 #endif // MAPLAYOUT_H

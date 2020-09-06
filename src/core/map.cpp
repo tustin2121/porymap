@@ -1,8 +1,9 @@
 #include "history.h"
-#include "historyitem.h"
 #include "map.h"
 #include "imageproviders.h"
 #include "scripting.h"
+
+#include "editcommands.h"
 
 #include <QTime>
 #include <QPainter>
@@ -12,6 +13,15 @@
 
 Map::Map(QObject *parent) : QObject(parent)
 {
+    editHistory.setClean();
+}
+
+Map::~Map() {
+    // delete all associated events
+    while (!ownedEvents.isEmpty()) {
+        Event *last = ownedEvents.takeLast();
+        if (last) delete last;
+    }
 }
 
 void Map::setName(QString mapName) {
@@ -413,100 +423,10 @@ void Map::_floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_
     }
 }
 
-void Map::undo() {
-    bool redraw = false, changed = false;
-    HistoryItem *commit = metatileHistory.back();
-    if (!commit)
-        return;
-
-    if (layout->blockdata) {
-        layout->blockdata->copyFrom(commit->metatiles);
-        if (commit->layoutWidth != this->getWidth() || commit->layoutHeight != this->getHeight()) {
-            this->setDimensions(commit->layoutWidth, commit->layoutHeight, false);
-            redraw = true;
-        }
-        changed = true;
-    }
-    if (layout->border) {
-        layout->border->copyFrom(commit->border);
-        if (commit->borderWidth != this->getBorderWidth() || commit->borderHeight != this->getBorderHeight()) {
-            this->setBorderDimensions(commit->borderWidth, commit->borderHeight, false);
-            redraw = true;
-        }
-        changed = true;
-    }
-
-    if (redraw) {
-        emit mapNeedsRedrawing();
-    }
-    if (changed) {
-        emit mapChanged(this);
-    }
-}
-
-void Map::redo() {
-    bool redraw = false, changed = false;
-    HistoryItem *commit = metatileHistory.next();
-    if (!commit)
-        return;
-
-    if (layout->blockdata) {
-        layout->blockdata->copyFrom(commit->metatiles);
-        if (commit->layoutWidth != this->getWidth() || commit->layoutHeight != this->getHeight()) {
-            this->setDimensions(commit->layoutWidth, commit->layoutHeight, false);
-            redraw = true;
-        }
-        changed = true;
-    }
-    if (layout->border) {
-        layout->border->copyFrom(commit->border);
-        if (commit->borderWidth != this->getBorderWidth() || commit->borderHeight != this->getBorderHeight()) {
-            this->setBorderDimensions(commit->borderWidth, commit->borderHeight, false);
-            redraw = true;
-        }
-        changed = true;
-    }
-
-    if (redraw) {
-        emit mapNeedsRedrawing();
-    }
-    if (changed) {
-        emit mapChanged(this);
-    }
-}
-
-void Map::commit() {
-    if (!layout) {
-        return;
-    }
-
-    int layoutWidth = this->getWidth();
-    int layoutHeight = this->getHeight();
-    int borderWidth = this->getBorderWidth();
-    int borderHeight = this->getBorderHeight();
-
-    if (layout->blockdata) {
-        HistoryItem *item = metatileHistory.current();
-        bool atCurrentHistory = item
-                && layout->blockdata->equals(item->metatiles)
-                && layout->border->equals(item->border)
-                && layoutWidth == item->layoutWidth
-                && layoutHeight == item->layoutHeight
-                && borderWidth == item->borderWidth 
-                && borderHeight == item->borderHeight;
-        if (!atCurrentHistory) {
-            HistoryItem *commit = new HistoryItem(layout->blockdata->copy(), layout->border->copy(), layoutWidth, layoutHeight, borderWidth, borderHeight);
-            metatileHistory.push(commit);
-            emit mapChanged(this);
-        }
-    }
-}
-
 void Map::floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t elevation) {
     Block *block = getBlock(x, y);
     if (block && (block->collision != collision || block->elevation != elevation)) {
         _floodFillCollisionElevation(x, y, collision, elevation);
-        commit();
     }
 }
 
@@ -526,7 +446,6 @@ void Map::magicFillCollisionElevation(int initialX, int initialY, uint16_t colli
                 }
             }
         }
-        commit();
     }
 }
 
@@ -546,8 +465,9 @@ void Map::removeEvent(Event *event) {
 
 void Map::addEvent(Event *event) {
     events[event->get("event_group_type")].append(event);
+    if (!ownedEvents.contains(event)) ownedEvents.append(event);
 }
 
 bool Map::hasUnsavedChanges() {
-    return !metatileHistory.isSaved() || !isPersistedToFile || layout->has_unsaved_changes;
+    return !editHistory.isClean() || !isPersistedToFile;
 }
