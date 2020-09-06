@@ -1,7 +1,9 @@
+Makefile
 porymap.pro.user
 *.autosave
 *.stash
 *.o
+*.DS_Store
 porymap.app*
 porymap
 porymap.cfg

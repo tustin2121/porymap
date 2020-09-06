@@ -157,7 +157,7 @@ QList<Token> ParseUtil::generatePostfix(QList<Token> tokens) {
     QList<Token> output;
     QStack<Token> operatorStack;
     for (Token token : tokens) {
-        if (token.type == TokenType::Number) {
+        if (token.type == TokenClass::Number) {
             output.append(token);
         } else if (token.value == "(") {
             operatorStack.push(token);
@@ -198,7 +198,7 @@ QList<Token> ParseUtil::generatePostfix(QList<Token> tokens) {
 int ParseUtil::evaluatePostfix(QList<Token> postfix) {
     QStack<Token> stack;
     for (Token token : postfix) {
-        if (token.type == TokenType::Operator && stack.size() > 1) {
+        if (token.type == TokenClass::Operator && stack.size() > 1) {
             int op2 = stack.pop().value.toInt(nullptr, 0);
             int op1 = stack.pop().value.toInt(nullptr, 0);
             int result = 0;
@@ -222,12 +222,11 @@ int ParseUtil::evaluatePostfix(QList<Token> postfix) {
                 result = op1 | op2;
             }
             stack.push(Token(QString("%1").arg(result), "decimal"));
-        } else if (token.type != TokenType::Error) {
+        } else if (token.type != TokenClass::Error) {
             stack.push(token);
         } // else ignore errored tokens, we have already warned the user.
     }
-
-    return stack.pop().value.toInt(nullptr, 0);
+    return stack.size() ? stack.pop().value.toInt(nullptr, 0) : 0;
 }
 
 QString ParseUtil::readCIncbin(QString filename, QString label) {
@@ -243,7 +242,7 @@ QString ParseUtil::readCIncbin(QString filename, QString label) {
         "\\b%1\\b"
         "\\s*\\[?\\s*\\]?\\s*=\\s*"
         "INCBIN_[US][0-9][0-9]?"
-        "\\(\"([^\"]*)\"\\)").arg(label));
+        "\\(\\s*\"([^\"]*)\"\\s*\\)").arg(label));
 
     int pos = re->indexIn(text);
     if (pos != -1) {
@@ -253,8 +252,7 @@ QString ParseUtil::readCIncbin(QString filename, QString label) {
     return path;
 }
 
-QMap<QString, int> ParseUtil::readCDefines(QString filename, QStringList prefixes) {
-    QMap<QString, int> allDefines;
+QMap<QString, int> ParseUtil::readCDefines(QString filename, QStringList prefixes, QMap<QString, int> allDefines) {
     QMap<QString, int> filteredDefines;
 
     file = filename;
@@ -273,6 +271,8 @@ QMap<QString, int> ParseUtil::readCDefines(QString filename, QStringList prefixe
 
     text.replace(QRegularExpression("(//.*)|(\\/+\\*+[^*]*\\*+\\/+)"), "");
     text.replace(QRegularExpression("(\\\\\\s+)"), "");
+    allDefines.insert("FALSE", 0);
+    allDefines.insert("TRUE", 1);
 
     QRegularExpression re("#define\\s+(?<defineName>\\w+)[^\\S\\n]+(?<defineValue>.+)");
     QRegularExpressionMatchIterator iter = re.globalMatch(text);
@@ -292,8 +292,8 @@ QMap<QString, int> ParseUtil::readCDefines(QString filename, QStringList prefixe
     return filteredDefines;
 }
 
-void ParseUtil::readCDefinesSorted(QString filename, QStringList prefixes, QStringList* definesToSet) {    
-    QMap<QString, int> defines = readCDefines(filename, prefixes);
+void ParseUtil::readCDefinesSorted(QString filename, QStringList prefixes, QStringList* definesToSet, QMap<QString, int> knownDefines) {
+    QMap<QString, int> defines = readCDefines(filename, prefixes, knownDefines);
 
     // The defines should to be sorted by their underlying value, not alphabetically.
     // Reverse the map and read out the resulting keys in order.
@@ -314,15 +314,15 @@ QStringList ParseUtil::readCArray(QString filename, QString label) {
     file = filename;
     text = readTextFile(root + "/" + filename);
 
-    QRegularExpression re(QString("\\b%1\\b\\s*\\[?\\s*\\]?\\s*=\\s*\\{([^\\}]*)\\}").arg(label));
+    QRegularExpression re(QString(R"(\b%1\b\s*(\[?[^\]]*\])?\s*=\s*\{([^\}]*)\})").arg(label));
     QRegularExpressionMatch match = re.match(text);
 
     if (match.hasMatch()) {
-        QString body = match.captured(1);
+        QString body = match.captured(2);
         QStringList split = body.split(',');
         for (QString item : split) {
             item = item.trimmed();
-            if (!item.contains(QRegularExpression("[^A-Za-z0-9_&()]"))) list.append(item);
+            if (!item.contains(QRegularExpression("[^A-Za-z0-9_&()\\s]"))) list.append(item);
             // do not print error info here because this is called dozens of times
         }
     }
@@ -334,8 +334,8 @@ QMap<QString, QString> ParseUtil::readNamedIndexCArray(QString filename, QString
     text = readTextFile(root + "/" + filename);
     QMap<QString, QString> map;
 
-    QRegularExpression re_text(QString("\\b%1\\b\\s*\\[?\\s*\\]?\\s*=\\s*\\{([^\\}]*)\\}").arg(label));
-    QString body = re_text.match(text).captured(1).replace(QRegularExpression("\\s*"), "");
+    QRegularExpression re_text(QString(R"(\b%1\b\s*(\[?[^\]]*\])?\s*=\s*\{([^\}]*)\})").arg(label));
+    QString body = re_text.match(text).captured(2).replace(QRegularExpression("\\s*"), "");
     
     QRegularExpression re("\\[(?<index>[A-Za-z1-9_]*)\\]=(?<value>&?[A-Za-z1-9_]*)");
     QRegularExpressionMatchIterator iter = re.globalMatch(body);
@@ -408,5 +408,15 @@ bool ParseUtil::tryParseJsonFile(QJsonDocument *out, QString filepath) {
     }
 
     *out = jsonDoc;
+    return true;
+}
+
+bool ParseUtil::ensureFieldsExist(QJsonObject obj, QList<QString> fields) {
+    for (QString field : fields) {
+        if (!obj.contains(field)) {
+            logError(QString("JSON object is missing field '%1'.").arg(field));
+            return false;
+        }
+    }
     return true;
 }

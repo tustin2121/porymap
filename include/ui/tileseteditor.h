@@ -8,6 +8,7 @@
 #include "tileseteditormetatileselector.h"
 #include "tileseteditortileselector.h"
 #include "metatilelayersitem.h"
+#include "map.h"
 
 namespace Ui {
 class TilesetEditor;
@@ -34,10 +35,11 @@ class TilesetEditor : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit TilesetEditor(Project*, QString, QString, QWidget *parent = nullptr);
+    explicit TilesetEditor(Project*, Map*, QWidget *parent = nullptr);
     ~TilesetEditor();
+    void setMap(Map*);
     void setTilesets(QString, QString);
-    void init(Project*, QString, QString);
+    bool selectMetatile(uint16_t metatileId);
 
 private slots:
     void onHoveredMetatileChanged(uint16_t);
@@ -73,7 +75,13 @@ private slots:
 
     void on_comboBox_metatileBehaviors_activated(const QString &arg1);
 
+    void on_lineEdit_metatileLabel_editingFinished();
+
     void on_comboBox_layerType_activated(int arg1);
+
+    void on_comboBox_encounterType_activated(int arg1);
+
+    void on_comboBox_terrainType_activated(int arg1);
 
     void on_actionExport_Primary_Tiles_Image_triggered();
 
@@ -84,8 +92,9 @@ private slots:
     void on_actionImport_Secondary_Metatiles_triggered();
 
 private:
+    void init(Project*, Map*);
     void closeEvent(QCloseEvent*);
-    void initMetatileSelector();
+    void initMetatileSelector(Map*);
     void initTileSelector();
     void initSelectedTileItem();
     void initMetatileLayersItem();
@@ -93,6 +102,7 @@ private:
     void importTilesetTiles(Tileset*, bool);
     void importTilesetMetatiles(Tileset*, bool);
     void refresh();
+    void saveMetatileLabel();
     Ui::TilesetEditor *ui;
     History<MetatileHistoryItem*> metatileHistory;
     TilesetEditorMetatileSelector *metatileSelector = nullptr;

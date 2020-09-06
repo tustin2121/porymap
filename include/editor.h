@@ -31,6 +31,12 @@ class Editor : public QObject
     Q_OBJECT
 public:
     Editor(Ui::MainWindow* ui);
+    ~Editor();
+
+    Editor() = delete;
+    Editor(const Editor &) = delete;
+    Editor & operator = (const Editor &) = delete;
+
 public:
     Ui::MainWindow* ui;
     QObject *parent = nullptr;
@@ -43,7 +49,9 @@ public:
     void redo();
     void closeProject();
     bool setMap(QString map_name);
-    void displayMap();
+    void saveUiFields();
+    void saveEncounterTabData();
+    bool displayMap();
     void displayMetatileSelector();
     void displayMapMetatiles();
     void displayMapMovementPermissions();
@@ -56,11 +64,17 @@ public:
     void displayMapConnections();
     void displayMapBorder();
     void displayMapGrid();
+    void displayWildMonTables();
+
+    void updateMapBorder();
+    void updateMapConnections();
 
     void setEditingMap();
     void setEditingCollision();
     void setEditingObjects();
     void setEditingConnections();
+    void setMapEditingButtonsEnabled(bool enabled);
+    void clearWildMonTabWidgets();
     void setCurrentConnectionDirection(QString curDirection);
     void updateCurrentConnectionDirection(QString curDirection);
     void setConnectionsVisibility(bool visible);
@@ -68,6 +82,7 @@ public:
     void setConnectionMap(QString mapName);
     void addNewConnection();
     void removeCurrentConnection();
+    void addNewWildMonGroup(QWidget *window);
     void updateDiveMap(QString mapName);
     void updateEmergeMap(QString mapName);
     void setSelectedConnectionFromMap(QString mapName);
@@ -75,6 +90,7 @@ public:
     void updateSecondaryTileset(QString tilesetLabel, bool forceLoad = false);
     void toggleBorderVisibility(bool visible);
     void updateCustomMapHeaderValues(QTableWidget *);
+    void configureEncounterJSON(QWidget *);
     Tileset *getCurrentMapPrimaryTileset();
 
     DraggablePixmapItem *addMapEvent(Event *event);
@@ -84,6 +100,7 @@ public:
     Event* createNewEvent(QString event_type);
     void deleteEvent(Event *);
     void updateSelectedEvents();
+    void duplicateSelectedEvents();
     void redrawObject(DraggablePixmapItem *item);
     QList<DraggablePixmapItem *> *getObjects();
 
@@ -114,8 +131,8 @@ public:
     QList<DraggablePixmapItem*> *events = nullptr;
     QList<DraggablePixmapItem*> *selected_events = nullptr;
 
-    QString map_edit_mode;
-    QString prev_edit_mode;
+    QString map_edit_mode = "paint";
+    QString obj_edit_mode = "select";
 
     int scale_exp = 0;
     double scale_base = sqrt(2); // adjust scale factor with this
@@ -124,6 +141,8 @@ public:
     void objectsView_onMousePress(QMouseEvent *event);
     void objectsView_onMouseMove(QMouseEvent *event);
     void objectsView_onMouseRelease(QMouseEvent *event);
+
+    int getBorderDrawDistance(int dimension);
 
 private:
     void setConnectionItemsVisible(bool);
@@ -140,6 +159,7 @@ private:
     void updateMirroredConnectionDirection(MapConnection*, QString);
     void updateMirroredConnectionMap(MapConnection*, QString);
     void updateMirroredConnection(MapConnection*, QString, QString, bool isDelete = false);
+    void updateEncounterFields(EncounterFields newFields);
     Event* createNewObjectEvent();
     Event* createNewWarpEvent();
     Event* createNewHealLocationEvent();
@@ -149,6 +169,8 @@ private:
     Event* createNewHiddenItemEvent();
     Event* createNewSecretBaseEvent();
     QString getMovementPermissionText(uint16_t collision, uint16_t elevation);
+    QString getMetatileDisplayMessage(uint16_t metatileId);
+    bool eventLimitReached(Map *, QString);
 
 private slots:
     void onMapStartPaint(QGraphicsSceneMouseEvent *event, MapPixmapItem *item);
@@ -175,7 +197,7 @@ signals:
     void objectsChanged();
     void selectedObjectsChanged();
     void loadMapRequested(QString, QString);
-    void tilesetChanged(QString);
+    void wildMonDataChanged();
     void warpEventDoubleClicked(QString mapName, QString warpNum);
     void currentMetatilesSelectionChanged();
     void wheelZoom(int delta);

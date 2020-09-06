@@ -1,6 +1,6 @@
 # Installation
 
-porymap requires Qt 5 & C++11.
+porymap requires Qt 5.14.2 & C++11.
 
 ## macOS
 
@@ -23,9 +23,13 @@ make
 ./porymap.app/Contents/MacOS/porymap
 ```
 
+## Windows
+
+Install [Qt development tools](https://www.qt.io/download-qt-installer), and use Qt Creator, the official Qt IDE, for development purposes.
+
 ## Ubuntu
 
-You need to install Qt 5. Qt 5.5 should be enough. You can check you Qt version
+You need to install Qt. The minimum supported version is currently Qt 5.14.2. You can check your Qt version
 with `qtdiag`.
 
 ```

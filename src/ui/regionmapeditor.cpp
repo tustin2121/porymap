@@ -62,13 +62,17 @@ void RegionMapEditor::setCurrentSquareOptions() {
     }
 }
 
-void RegionMapEditor::loadRegionMapData() {
-    this->region_map->init(project);
+bool RegionMapEditor::loadRegionMapData() {
+    if (!this->region_map->init(project)) {
+        return false;
+    }
+
     this->currIndex = this->region_map->width() * this->region_map->padTop + this->region_map->padLeft;
     displayRegionMap();
+    return true;
 }
 
-void RegionMapEditor::loadCityMaps() {
+bool RegionMapEditor::loadCityMaps() {
     QDir directory(project->root + "/graphics/pokenav/city_maps");
     QStringList files = directory.entryList(QStringList() << "*.bin", QDir::Files);
     QStringList without_bin;
@@ -76,6 +80,7 @@ void RegionMapEditor::loadCityMaps() {
         without_bin.append(file.remove(".bin"));
     }
     this->ui->comboBox_CityMap_picker->addItems(without_bin);
+    return true;
 }
 
 void RegionMapEditor::displayRegionMap() {
@@ -225,6 +230,11 @@ void RegionMapEditor::updateRegionMapEntryOptions(QString section) {
     this->ui->spinBox_RM_Entry_width->setEnabled(enabled);
     this->ui->spinBox_RM_Entry_height->setEnabled(enabled);
 
+    this->ui->spinBox_RM_Entry_x->blockSignals(true);
+    this->ui->spinBox_RM_Entry_y->blockSignals(true);
+    this->ui->spinBox_RM_Entry_width->blockSignals(true);
+    this->ui->spinBox_RM_Entry_height->blockSignals(true);
+
     this->ui->comboBox_RM_Entry_MapSection->setCurrentText(section);
     this->activeEntry = section;
     this->region_map_entries_item->currentSection = section;
@@ -233,6 +243,11 @@ void RegionMapEditor::updateRegionMapEntryOptions(QString section) {
     this->ui->spinBox_RM_Entry_y->setValue(entry.y);
     this->ui->spinBox_RM_Entry_width->setValue(entry.width);
     this->ui->spinBox_RM_Entry_height->setValue(entry.height);
+
+    this->ui->spinBox_RM_Entry_x->blockSignals(false);
+    this->ui->spinBox_RM_Entry_y->blockSignals(false);
+    this->ui->spinBox_RM_Entry_width->blockSignals(false);
+    this->ui->spinBox_RM_Entry_height->blockSignals(false);
 }
 
 void RegionMapEditor::displayRegionMapTileSelector() {
@@ -445,11 +460,6 @@ void RegionMapEditor::mouseEvent_region_map(QGraphicsSceneMouseEvent *event, Reg
 }
 
 void RegionMapEditor::mouseEvent_city_map(QGraphicsSceneMouseEvent *event, CityMapPixmapItem *item) {
-    QPointF pos = event->pos();
-    int x = static_cast<int>(pos.x()) / 8;
-    int y = static_cast<int>(pos.y()) / 8;
-    int index = this->city_map_item->getIndexAt(x, y);
-
     if (cityMapFirstDraw) {
         RegionMapHistoryItem *commit = new RegionMapHistoryItem(
             RegionMapEditorBox::CityMapImage, this->city_map_item->getTiles(), this->city_map_item->file
@@ -498,6 +508,7 @@ void RegionMapEditor::on_tabWidget_Region_Map_currentChanged(int index) {
 
 void RegionMapEditor::on_comboBox_RM_ConnectedMap_activated(const QString &mapsec) {
     this->ui->lineEdit_RM_MapName->setText(this->project->mapSecToMapHoverName->value(mapsec));
+    onRegionMapLayoutSelectedTileChanged(this->currIndex);// re-draw layout image
     this->hasUnsavedChanges = true;// sometimes this is called for unknown reasons
 }
 
@@ -548,7 +559,7 @@ void RegionMapEditor::on_spinBox_RM_Entry_height_valueChanged(int height) {
     this->hasUnsavedChanges = true;
 }
 
-void RegionMapEditor::on_lineEdit_RM_MapName_textEdited(const QString &text) {
+void RegionMapEditor::on_lineEdit_RM_MapName_textEdited(const QString &) {
     this->hasUnsavedChanges = true;
 }
 
@@ -810,8 +821,8 @@ void RegionMapEditor::importTileImage(bool city) {
     int maxAllowedTiles = 0x100;
     if (totalTiles > maxAllowedTiles) {
         QString errorMessage = QString("The total number of tiles in the provided image (%1) is greater than the allowed number (%2).")
-                                      .arg(maxAllowedTiles)
-                                      .arg(totalTiles);
+                                      .arg(totalTiles)
+                                      .arg(maxAllowedTiles);
         logError(errorMessage);
         QMessageBox msgBox(this);
         msgBox.setText("Failed to import tiles.");

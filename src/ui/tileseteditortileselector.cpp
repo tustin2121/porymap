@@ -22,19 +22,19 @@ void TilesetEditorTileSelector::draw() {
     int primaryLength = this->primaryTileset->tiles->length();
     int secondaryLength = this->secondaryTileset->tiles->length();
     int height = totalTiles / this->numTilesWide;
-    QList<QRgb> palette = Tileset::getPalette(this->paletteId, this->primaryTileset, this->secondaryTileset);
+    QList<QRgb> palette = Tileset::getPalette(this->paletteId, this->primaryTileset, this->secondaryTileset, true);
     QImage image(this->numTilesWide * 16, height * 16, QImage::Format_RGBA8888);
 
     QPainter painter(&image);
     for (uint16_t tile = 0; tile < totalTiles; tile++) {
         QImage tileImage;
         if (tile < primaryLength) {
-            tileImage = getColoredTileImage(tile, this->primaryTileset, this->secondaryTileset, this->paletteId).scaled(16, 16);
+            tileImage = getPalettedTileImage(tile, this->primaryTileset, this->secondaryTileset, this->paletteId, true).scaled(16, 16);
         } else if (tile < Project::getNumTilesPrimary()) {
             tileImage = QImage(16, 16, QImage::Format_RGBA8888);
             tileImage.fill(palette.at(0));
         } else if (tile < Project::getNumTilesPrimary() + secondaryLength) {
-            tileImage = getColoredTileImage(tile, this->primaryTileset, this->secondaryTileset, this->paletteId).scaled(16, 16);
+            tileImage = getPalettedTileImage(tile, this->primaryTileset, this->secondaryTileset, this->paletteId, true).scaled(16, 16);
         } else {
             tileImage = QImage(16, 16, QImage::Format_RGBA8888);
             QPainter painter(&tileImage);
@@ -71,6 +71,7 @@ void TilesetEditorTileSelector::setTilesets(Tileset *primaryTileset, Tileset *se
 
 void TilesetEditorTileSelector::setPaletteId(int paletteId) {
     this->paletteId = paletteId;
+    this->paletteChanged = true;
     this->draw();
 }
 
@@ -95,47 +96,66 @@ void TilesetEditorTileSelector::updateSelectedTiles() {
 
 QList<Tile> TilesetEditorTileSelector::getSelectedTiles() {
     if (this->externalSelection) {
-        return this->externalSelectedTiles;
+        return buildSelectedTiles(this->externalSelectionWidth, this->externalSelectionHeight, this->externalSelectedTiles);
     } else {
-        QList<Tile> tiles;
-        QList<QList<Tile>> tileMatrix;
-        QList<uint16_t> selected = this->selectedTiles;
         QPoint dimensions = this->getSelectionDimensions();
-        int width = dimensions.x();
-        int height = dimensions.y();
-        for (int j = 0; j < height; j++) {
-            QList<Tile> row;
-            for (int i = 0; i < width; i++) {
-                int index = i + j * width;
-                uint16_t tile = selected.at(index);
-                if (this->xFlip)
-                    row.prepend(Tile(tile, this->xFlip, this->yFlip, this->paletteId));
-                else
-                    row.append(Tile(tile, this->xFlip, this->yFlip, this->paletteId));
-            }
-            if (this->yFlip)
-                tileMatrix.prepend(row);
-            else
-                tileMatrix.append(row);
+        QList<Tile> tiles;
+        for (int i = 0; i < this->selectedTiles.length(); i++) {
+            uint16_t tile = this->selectedTiles.at(i);
+            tiles.append(Tile(tile, false, false, this->paletteId));
         }
-        for (int j = 0; j < height; j++) {
-            for (int i = 0; i < width; i++) {
-                tiles.append(tileMatrix.at(j).at(i));
-            }
-        }
-        return tiles;
+        return buildSelectedTiles(dimensions.x(), dimensions.y(), tiles);
     }
 }
 
-void TilesetEditorTileSelector::setExternalSelection(int width, int height, QList<Tile> tiles) {
+QList<Tile> TilesetEditorTileSelector::buildSelectedTiles(int width, int height, QList<Tile> selected) {
+    QList<Tile> tiles;
+    QList<QList<Tile>> tileMatrix;
+    for (int j = 0; j < height; j++) {
+        QList<Tile> row;
+        QList<Tile> layerRow;
+        for (int i = 0; i < width; i++) {
+            int index = i + j * width;
+            Tile tile = selected.at(index);
+            tile.xflip ^= this->xFlip;
+            tile.yflip ^= this->yFlip;
+            if (this->paletteChanged)
+                tile.palette = this->paletteId;
+            if (this->xFlip)
+                layerRow.prepend(tile);
+            else
+                layerRow.append(tile);
+
+            // If we've completed a layer row, or its the last tile of an incompletely
+            // selected layer, then append the layer row to the full row
+            // If not an external selection, treat the whole row as 1 "layer"
+            if (i == width - 1 || (this->externalSelection && (this->externalSelectedPos.at(index) % 4) & 1)) {
+                row.append(layerRow);
+                layerRow.clear();
+            }
+        }
+        if (this->yFlip)
+            tileMatrix.prepend(row);
+        else
+            tileMatrix.append(row);
+    }
+    for (int j = 0; j < height; j++) {
+        for (int i = 0; i < width; i++) {
+            tiles.append(tileMatrix.at(j).at(i));
+        }
+    }
+    return tiles;
+}
+
+void TilesetEditorTileSelector::setExternalSelection(int width, int height, QList<Tile> tiles, QList<int> tileIdxs) {
     this->externalSelection = true;
+    this->paletteChanged = false;
     this->externalSelectionWidth = width;
     this->externalSelectionHeight = height;
     this->externalSelectedTiles.clear();
-    for (int i = 0; i < tiles.length(); i++) {
-        this->externalSelectedTiles.append(tiles.at(i));
-    }
-
+    this->externalSelectedTiles.append(tiles);
+    this->externalSelectedPos.clear();
+    this->externalSelectedPos.append(tileIdxs);
     this->draw();
     emit selectedTilesChanged();
 }
@@ -200,30 +220,33 @@ QImage TilesetEditorTileSelector::buildPrimaryTilesIndexedImage() {
     }
 
     int primaryLength = this->primaryTileset->tiles->length();
-    int height = primaryLength / this->numTilesWide;
-    QList<QRgb> palette = Tileset::getPalette(this->paletteId, this->primaryTileset, this->secondaryTileset);
+    int height = qCeil(primaryLength / static_cast<double>(this->numTilesWide));
     QImage image(this->numTilesWide * 8, height * 8, QImage::Format_RGBA8888);
 
     QPainter painter(&image);
     for (uint16_t tile = 0; tile < primaryLength; tile++) {
         QImage tileImage;
         if (tile < primaryLength) {
-            tileImage = getColoredTileImage(tile, this->primaryTileset, this->secondaryTileset, this->paletteId);
+            tileImage = getGreyscaleTileImage(tile, this->primaryTileset, this->secondaryTileset);
         } else {
             tileImage = QImage(8, 8, QImage::Format_RGBA8888);
-            tileImage.fill(palette.at(0));
+            tileImage.fill(qRgb(0, 0, 0));
         }
 
         int y = tile / this->numTilesWide;
         int x = tile % this->numTilesWide;
         QPoint origin = QPoint(x * 8, y * 8);
-        painter.drawImage(origin, tileImage.mirrored(this->xFlip, this->yFlip));
+        painter.drawImage(origin, tileImage);
     }
 
     painter.end();
 
-    QVector<QRgb> colorTable = palette.toVector();
-    return image.convertToFormat(QImage::Format::Format_Indexed8, colorTable);
+    // Image is first converted using greyscale so that palettes with duplicate colors
+    // are properly represented in the final image.
+    QImage indexedImage = image.convertToFormat(QImage::Format::Format_Indexed8, greyscalePalette.toVector());
+    QList<QRgb> palette = Tileset::getPalette(this->paletteId, this->primaryTileset, this->secondaryTileset, true);
+    indexedImage.setColorTable(palette.toVector());
+    return indexedImage;
 }
 
 QImage TilesetEditorTileSelector::buildSecondaryTilesIndexedImage() {
@@ -233,8 +256,7 @@ QImage TilesetEditorTileSelector::buildSecondaryTilesIndexedImage() {
     }
 
     int secondaryLength = this->secondaryTileset->tiles->length();
-    int height = secondaryLength / this->numTilesWide;
-    QList<QRgb> palette = Tileset::getPalette(this->paletteId, this->primaryTileset, this->secondaryTileset);
+    int height = qCeil(secondaryLength / static_cast<double>(this->numTilesWide));
     QImage image(this->numTilesWide * 8, height * 8, QImage::Format_RGBA8888);
 
     QPainter painter(&image);
@@ -242,20 +264,24 @@ QImage TilesetEditorTileSelector::buildSecondaryTilesIndexedImage() {
     for (uint16_t tile = 0; tile < secondaryLength; tile++) {
         QImage tileImage;
         if (tile < secondaryLength) {
-            tileImage = getColoredTileImage(tile + primaryLength, this->primaryTileset, this->secondaryTileset, this->paletteId);
+            tileImage = getGreyscaleTileImage(tile + primaryLength, this->primaryTileset, this->secondaryTileset);
         } else {
             tileImage = QImage(8, 8, QImage::Format_RGBA8888);
-            tileImage.fill(palette.at(0));
+            tileImage.fill(qRgb(0, 0, 0));
         }
 
         int y = tile / this->numTilesWide;
         int x = tile % this->numTilesWide;
         QPoint origin = QPoint(x * 8, y * 8);
-        painter.drawImage(origin, tileImage.mirrored(this->xFlip, this->yFlip));
+        painter.drawImage(origin, tileImage);
     }
 
     painter.end();
 
-    QVector<QRgb> colorTable = palette.toVector();
-    return image.convertToFormat(QImage::Format::Format_Indexed8, colorTable);
+    // Image is first converted using greyscale so that palettes with duplicate colors
+    // are properly represented in the final image.
+    QImage indexedImage = image.convertToFormat(QImage::Format::Format_Indexed8, greyscalePalette.toVector());
+    QList<QRgb> palette = Tileset::getPalette(this->paletteId, this->primaryTileset, this->secondaryTileset, true);
+    indexedImage.setColorTable(palette.toVector());
+    return indexedImage;
 }

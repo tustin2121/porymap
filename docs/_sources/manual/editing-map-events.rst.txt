@@ -9,7 +9,7 @@ Events are what bring your maps to life.  They include NPCs, signposts, warps, s
 
     Map Events View
 
-All of the events are visible on the map.  The Event Details window on the right displays the properties of the currently-selected event.  If you look closely, you'll see that the woman NPC near the Pokémon Center has a pink border around it because it's selected.  To select a different event, simple click on an event in the map area.  Alternatively, you can use the spinner at the top of the event properties window.  Multiple events can be selected at the same time by holding ``Ctrl`` and clicking another event.
+All of the events are visible on the map.  The Event Details window on the right displays the properties of the currently-selected event.  If you look closely, you'll see that the woman NPC near the Pokémon Center has a pink border around it because it's selected.  To select a different event, simply click on an event in the map area.  Alternatively, you can use the spinner at the top of the event properties window.  Multiple events can be selected at the same time by holding ``Ctrl`` and clicking another event.
 
 .. figure:: images/editing-map-events/event-id-spinner.png
     :alt: Event Id Spinner
@@ -19,7 +19,20 @@ All of the events are visible on the map.  The Event Details window on the right
 .. warning::
     There is currently no undo/redo functionality when editing events!  Use Git version control!
 
-Events Positions
+Adding & Deleting Events
+------------------------
+
+To add a new event, press the green plus button. |add-event-button|  You can choose between the different types of events by clicking the small arrow on the right. You can also duplicate any currently selected events with ``Ctrl+D``.
+
+.. |add-event-button|
+   image:: images/editing-map-events/add-event-button.png
+
+To delete the selected event, press the delete button. |delete-event-button|
+
+.. |delete-event-button|
+   image:: images/editing-map-events/delete-event-button.png
+
+Event Positions
 ----------------
 
 All events have X/Y coordinates.  To move an Event, click and drag it to a new position on the map.  Alternatively, you can use the X and Y spinners in the event properties.
@@ -33,18 +46,18 @@ Events also have an elevation, also known as Z coordinates (see image above).  E
 
 Next, we'll cover each type of event in detail.
 
-Event Objects
+Object Events
 -------------
 
-Event objects are typically used for NPCs (non-player-characters).  More technically, it's any event that has a sprite and the ability to move around.  Event objects are displayed using their assigned sprite, except for special cases.  Any event object that uses a dynamic sprite will be displayed as a blue square with an `N` |dynamic-sprite|.  Some examples of dynamic sprites are the player's rival and berry trees.
+Object events are typically used for NPCs (non-player-characters).  More technically, it's any event that has a sprite and the ability to move around.  Object events are displayed using their assigned sprite, except for special cases.  Any object event that uses a dynamic sprite will be displayed as a blue square with an `N` |dynamic-sprite|.  Some examples of dynamic sprites are the player's rival and berry trees.
 
 .. |dynamic-sprite|
    image:: images/editing-map-events/dynamic-sprite.png
 
 .. figure:: images/editing-map-events/event-object.png
-    :alt: Event Object Properties
+    :alt: Object Event Properties
 
-    Event Object Properties
+    Object Event Properties
 
 Id
     This is the local id of the object in the map.  Some script values use this local id to specify object when using scripting commands such as `applymovement`.
@@ -65,22 +78,25 @@ Event Flag
     The flag value that controls if the object is visible.  If the flag is set (equal to 1), then the object will be invisible.  If the Event Flag is set to `0`, then the object will always be visible because `0` means "no flag".
 
 Trainer Type
-    `NONE`, `NORMAL`, or `SEE ALL DIRECTIONS`. If the object is a trainer, `NORMAL` means that the trainer will spot the player in the object's line-of-sight.
+    The trainer type used by the object. If the object is a trainer, `TRAINER_TYPE_NORMAL` means that the trainer will spot the player in the object's line-of-sight.
 
 Sight Radius or Berry Tree ID
     If the object is a trainer, this property control how many tiles the trainer can see to spot the player for battle.  If the object is a berry tree, this specifies the global id of the berry tree.  Each berry tree in the game has a unique berry tree id.
 
+In Connection
+    Exclusive to pokefirered. Used to replace objects that are visible in a map's connection with their corresponding object on the connecting map. When checked, these objects will make odd use of other fields; its trainer type value will be the connecting map number, its Sight Radius / Berry Tree Id will be the connecting map group, and its z coordinate will be the object's local id on the connecting map. 
+
 .. _event-warps:
 
-Event Warps
+Warp Events
 -----------
 
-Event warps are how the player is able to warp to other maps, such as entering a building.  Double-clicking on a warp will automatically open the destination map and select the destination warp.  This makes it very easy to navigate around in Porymap.
+Warp events are how the player is able to warp to other maps, such as entering a building.  Double-clicking on a warp will automatically open the destination map and select the destination warp.  This makes it very easy to navigate around in Porymap.
 
 .. figure:: images/editing-map-events/event-warp.png
-    :alt: Event Warp Properties
+    :alt: Warp Event Properties
 
-    Event Warp Properties
+    Warp Event Properties
 
 Id
     This is the local id of the warp in the map.  This is used when setting the Destination Warp property for another warp.
@@ -91,15 +107,15 @@ Destination Map
 Destination Warp
     The Id of the warp in the destination map.
 
-Event Triggers
+Trigger Events
 --------------
 
-Event triggers are scripts that execute when the player walks over them.  However, they only execute when a variable is equal some value.  Typically, they execute once, set the variable's value to something else, and then never execute again because the variable's value no longer matches.
+Trigger events are scripts that execute when the player walks over them.  However, they only execute when a variable is equal some value.  Typically, they execute once, set the variable's value to something else, and then never execute again because the variable's value no longer matches.
 
 .. figure:: images/editing-map-events/event-trigger.png
-    :alt: Event Trigger Properties
+    :alt: Trigger Event Properties
 
-    Event Trigger Properties
+    Trigger Event Properties
 
 Id
     The local id of the trigger in the map.  This value is not used for anything.
@@ -113,15 +129,15 @@ Var
 Var Value
     The value that the Var must equal for the trigger's Script to execute.
 
-Event Weather Triggers
+Weather Trigger Events
 ----------------------
 
-Event weather triggers are a very specific type of trigger.  When the player walks over a weather trigger, the overworld's weather will transition to the specified weather type.
+Weather trigger events are a very specific type of trigger.  When the player walks over a weather trigger, the overworld's weather will transition to the specified weather type. This event type is unavailable for pokefirered projects; the functions to trigger weather changes were dummied out.
 
 .. figure:: images/editing-map-events/event-weather-trigger.png
-    :alt: Event Weather Trigger Properties
+    :alt: Weather Trigger Event Properties
 
-    Event Weather Trigger Properties
+    Weather Trigger Event Properties
 
 Id
     The local id of the trigger in the map.  This value is not used for anything.
@@ -129,15 +145,15 @@ Id
 Weather
     The type of weather to transition to.
 
-Event Signs
+Sign Event
 -----------
 
-Event signs, or signposts, are simple interactable scripts.  They are typically used for things like signs in front of buildings.  The player's facing direction can be required to be a certain direction in order to interact with the sign.  Signs are the first of three "BG" event types.
+Sign events, or signposts, are simple interactable scripts.  They are typically used for things like signs in front of buildings.  The player's facing direction can be required to be a certain direction in order to interact with the sign.  Signs are the first of three "BG" event types.
 
 .. figure:: images/editing-map-events/event-sign.png
-    :alt: Event Sign Properties
+    :alt: Sign Event Properties
 
-    Event Sign Properties
+    Sign Event Properties
 
 Id
     The local id of the BG event in the map.  This value is not used for anything.
@@ -148,15 +164,15 @@ Player Facing Direction
 Script
     The script that executes when the player interacts with the sign.
 
-Event Hidden Item
+Hidden Item Event
 -----------------
 
 Hidden items are invisible items that can be picked up by the player. They each use a flag to ensure the item can only be picked up once.
 
 .. figure:: images/editing-map-events/event-hidden-item.png
-    :alt: Event Hidden Item Properties
+    :alt: Hidden Item Event Properties
 
-    Event Hidden Item Properties
+    Hidden Item Event Properties
 
 Id
     The local id of the BG event in the map.  This value is not used for anything.
@@ -167,15 +183,22 @@ Item
 Flag
     This flag is set when the player receives the hidden item.
 
-Event Secret Base
+Quantity
+    Exclusive to pokefirered. The number of items received when the item is picked up.
+
+Requires Itemfinder
+    Exclusive to pokefirered. When checked, the hidden item can only be received by standing on it and using the Itemfinder.
+
+Secret Base Event
 -----------------
 
 This is the event used to mark entrances to secret bases.  This event will only be functional on certain metatiles.  Unfortunately, they are hardcoded into the game's engine (see ``sSecretBaseEntranceMetatiles`` in ``src/secret_base.c``).
+This event type is unavailable for pokefirered projects; secret bases do not exist there.
 
 .. figure:: images/editing-map-events/event-secret-base.png
-    :alt: Event Secret Base Properties
+    :alt: Secret Base Event Properties
 
-    Event Secret Base Properties
+    Secret Base Event Properties
 
 Id
     The local id of the BG event in the map.  This value is not used for anything.
@@ -183,18 +206,21 @@ Id
 Secret Base Id
     The id of the destination secret base.
 
-Adding & Deleting Events
-------------------------
+Heal Location / Healspots
+-------------------------
 
-To add a new event, press the green plus button. |add-event-button|  You can choose between the different types of events by clicking the small arrow on the right.
+This event is used to control where a player will arrive when they white out or fly to the map. The white out functions a little differently between game versions. For pokeemerald and pokeruby players will arrive at the event's coordinates after a white out, while in pokefirered they will arrive on the map set in ``Respawn Map`` and at hardcoded coordinates (see ``SetWhiteoutRespawnWarpAndHealerNpc`` in ``src/heal_location.c``).
 
-.. |add-event-button|
-   image:: images/editing-map-events/add-event-button.png
+.. figure:: images/editing-map-events/event-heal-location.png
+    :alt: Heal Location Properties
 
-To delete the selected event, press the delete button. |delete-event-button|
+    Heal Location Properties
 
-.. |delete-event-button|
-   image:: images/editing-map-events/delete-event-button.png
+Respawn Map
+    Exclusive to pokefirered. The map where the player will arrive when they white out (e.g. inside the PokéCenter that the heal location is in front of).
+
+Respawn NPC
+    Exclusive to pokefirered. The local id of the NPC the player will interact with when they white out.
 
 Open Map Scripts
 ----------------
@@ -203,3 +229,25 @@ Clicking the ``Open Map Scripts`` button |open-map-scripts-button| will open the
 
 .. |open-map-scripts-button|
    image:: images/editing-map-events/open-map-scripts-button.png
+
+Tool Buttons
+------------
+
+The event editing tab also extends functionality to a few of the tool buttons described in :ref:`Editing Map Tiles <editing-map-tiles>`.
+A brief description and animation is listed for each of the available tools below:
+
+Pencil
+    When clicking on an existing event, the pencil tool will behave normally (as the standard cursor). It can also be used to "draw" events in a certain location. The event created will be a default-valued event of the same type as the currently selected event.
+
+.. figure:: images/editing-map-events/event-tool-pencil.gif
+    :alt: Drawing Object Events with the Pencil Tool
+
+    Drawing Object Events with the Pencil Tool
+
+Shift
+    You can use the shift tool to move any number of events together. When a selected event is dragged, all other selected events will move with it. When a tile with no event is clicked, all events on the map can be dragged.
+
+.. figure:: images/editing-map-events/event-tool-shift.gif
+    :alt: Moving Events with the Shift Tool
+
+    Moving Events with the Shift Tool

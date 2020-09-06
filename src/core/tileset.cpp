@@ -2,6 +2,7 @@
 #include "metatile.h"
 #include "project.h"
 #include "log.h"
+#include "config.h"
 
 #include <QPainter>
 #include <QImage>
@@ -45,6 +46,14 @@ Tileset* Tileset::copy() {
         }
         copy->palettes->append(copyPalette);
     }
+    copy->palettePreviews = new QList<QList<QRgb>>;
+    for (QList<QRgb> palette : *this->palettePreviews) {
+        QList<QRgb> copyPalette;
+        for (QRgb color : palette) {
+            copyPalette.append(color);
+        }
+        copy->palettePreviews->append(copyPalette);
+    }
     return copy;
 }
 
@@ -66,24 +75,40 @@ Metatile* Tileset::getMetatile(int index, Tileset *primaryTileset, Tileset *seco
     return metatile;
 }
 
-QList<QList<QRgb>> Tileset::getBlockPalettes(Tileset *primaryTileset, Tileset *secondaryTileset) {
+bool Tileset::metatileIsValid(uint16_t metatileId, Tileset *primaryTileset, Tileset *secondaryTileset) {
+    if (metatileId >= Project::getNumMetatilesTotal())
+        return false;
+
+    if (metatileId < Project::getNumMetatilesPrimary() && metatileId >= primaryTileset->metatiles->length())
+        return false;
+
+    if (metatileId >= Project::getNumMetatilesPrimary() + secondaryTileset->metatiles->length())
+        return false;
+
+    return true;
+}
+
+QList<QList<QRgb>> Tileset::getBlockPalettes(Tileset *primaryTileset, Tileset *secondaryTileset, bool useTruePalettes) {
     QList<QList<QRgb>> palettes;
+    auto primaryPalettes = useTruePalettes ? primaryTileset->palettes : primaryTileset->palettePreviews;
     for (int i = 0; i < Project::getNumPalettesPrimary(); i++) {
-        palettes.append(primaryTileset->palettes->at(i));
+        palettes.append(primaryPalettes->at(i));
     }
+    auto secondaryPalettes = useTruePalettes ? secondaryTileset->palettes : secondaryTileset->palettePreviews;
     for (int i = Project::getNumPalettesPrimary(); i < Project::getNumPalettesTotal(); i++) {
-        palettes.append(secondaryTileset->palettes->at(i));
+        palettes.append(secondaryPalettes->at(i));
     }
     return palettes;
 }
 
-QList<QRgb> Tileset::getPalette(int paletteId, Tileset *primaryTileset, Tileset *secondaryTileset) {
+QList<QRgb> Tileset::getPalette(int paletteId, Tileset *primaryTileset, Tileset *secondaryTileset, bool useTruePalettes) {
     QList<QRgb> paletteTable;
     Tileset *tileset = paletteId < Project::getNumPalettesPrimary()
             ? primaryTileset
             : secondaryTileset;
-    for (int i = 0; i < tileset->palettes->at(paletteId).length(); i++) {
-        paletteTable.append(tileset->palettes->at(paletteId).at(i));
+    auto palettes = useTruePalettes ? tileset->palettes : tileset->palettePreviews;
+    for (int i = 0; i < palettes->at(paletteId).length(); i++) {
+        paletteTable.append(palettes->at(paletteId).at(i));
     }
     return paletteTable;
 }
@@ -102,8 +127,13 @@ bool Tileset::appendToHeaders(QString headerFile, QString friendlyName){
     dataString.append(QString("\t.4byte gTilesetTiles_%1\n").arg(friendlyName));
     dataString.append(QString("\t.4byte gTilesetPalettes_%1\n").arg(friendlyName));
     dataString.append(QString("\t.4byte gMetatiles_%1\n").arg(friendlyName));
-    dataString.append(QString("\t.4byte gMetatileAttributes_%1\n").arg(friendlyName));
-    dataString.append("\t.4byte NULL\n");
+    if (projectConfig.getBaseGameVersion() == BaseGameVersion::pokefirered) {
+        dataString.append("\t.4byte NULL\n");
+        dataString.append(QString("\t.4byte gMetatileAttributes_%1\n").arg(friendlyName));
+    } else {
+        dataString.append(QString("\t.4byte gMetatileAttributes_%1\n").arg(friendlyName));
+        dataString.append("\t.4byte NULL\n");
+    }
     file.write(dataString.toUtf8());
     file.flush();
     file.close();

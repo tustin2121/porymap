@@ -17,6 +17,7 @@ KeyValueConfigBase::~KeyValueConfigBase() {
 }
 
 void KeyValueConfigBase::load() {
+    reset();
     QFile file(this->getConfigFilepath());
     if (!file.exists()) {
         if (!file.open(QIODevice::WriteOnly)) {
@@ -35,7 +36,7 @@ void KeyValueConfigBase::load() {
     QTextStream in(&file);
     in.setCodec("UTF-8");
     QList<QString> configLines;
-    QRegularExpression re("^(?<key>.+)=(?<value>.+)$");
+    QRegularExpression re("^(?<key>.+)=(?<value>.*)$");
     while (!in.atEnd()) {
         QString line = in.readLine().trimmed();
         int commentIndex = line.indexOf("#");
@@ -55,6 +56,7 @@ void KeyValueConfigBase::load() {
 
         this->parseConfigKeyValue(match.captured("key").toLower(), match.captured("value"));
     }
+    this->setUnreadKeys();
 
     file.close();
 }
@@ -126,8 +128,6 @@ void PorymapConfig::parseConfigKeyValue(QString key, QString value) {
         this->windowState = bytesFromString(value);
     } else if (key == "map_splitter_state") {
         this->mapSplitterState = bytesFromString(value);
-    } else if (key == "events_splitter_state") {
-        this->eventsSlpitterState = bytesFromString(value);
     } else if (key == "main_splitter_state") {
         this->mainSplitterState = bytesFromString(value);
     } else if (key == "collision_opacity") {
@@ -156,6 +156,12 @@ void PorymapConfig::parseConfigKeyValue(QString key, QString value) {
         if (!ok) {
             logWarn(QString("Invalid config value for show_cursor_tile: '%1'. Must be 0 or 1.").arg(value));
         }
+    } else if (key == "monitor_files") {
+        bool ok;
+        this->monitorFiles = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for monitor_files: '%1'. Must be 0 or 1.").arg(value));
+        }
     } else if (key == "region_map_dimensions") {
         bool ok1, ok2;
         QStringList dims = value.split("x");
@@ -167,6 +173,8 @@ void PorymapConfig::parseConfigKeyValue(QString key, QString value) {
         } else {
             this->regionMapDimensions = QSize(w, h);
         }
+    } else if (key == "theme") {
+        this->theme = value;
     } else {
         logWarn(QString("Invalid config key found in config file %1: '%2'").arg(this->getConfigFilepath()).arg(key));
     }
@@ -181,14 +189,15 @@ QMap<QString, QString> PorymapConfig::getKeyValueMap() {
     map.insert("window_geometry", stringFromByteArray(this->windowGeometry));
     map.insert("window_state", stringFromByteArray(this->windowState));
     map.insert("map_splitter_state", stringFromByteArray(this->mapSplitterState));
-    map.insert("events_splitter_state", stringFromByteArray(this->eventsSlpitterState));
     map.insert("main_splitter_state", stringFromByteArray(this->mainSplitterState));
     map.insert("collision_opacity", QString("%1").arg(this->collisionOpacity));
     map.insert("metatiles_zoom", QString("%1").arg(this->metatilesZoom));
     map.insert("show_player_view", this->showPlayerView ? "1" : "0");
     map.insert("show_cursor_tile", this->showCursorTile ? "1" : "0");
+    map.insert("monitor_files", this->monitorFiles ? "1" : "0");
     map.insert("region_map_dimensions", QString("%1x%2").arg(this->regionMapDimensions.width())
                                                         .arg(this->regionMapDimensions.height()));
+    map.insert("theme", this->theme);
     return map;
 }
 
@@ -229,12 +238,16 @@ void PorymapConfig::setPrettyCursors(bool enabled) {
     this->save();
 }
 
-void PorymapConfig::setGeometry(QByteArray windowGeometry_, QByteArray windowState_, QByteArray mapSplitterState_, 
-                                QByteArray eventsSlpitterState_, QByteArray mainSplitterState_) {
+void PorymapConfig::setMonitorFiles(bool monitor) {
+    this->monitorFiles = monitor;
+    this->save();
+}
+
+void PorymapConfig::setGeometry(QByteArray windowGeometry_, QByteArray windowState_,
+                                QByteArray mapSplitterState_, QByteArray mainSplitterState_) {
     this->windowGeometry = windowGeometry_;
     this->windowState = windowState_;
     this->mapSplitterState = mapSplitterState_;
-    this->eventsSlpitterState = eventsSlpitterState_;
     this->mainSplitterState = mainSplitterState_;
     this->save();
 }
@@ -263,6 +276,10 @@ void PorymapConfig::setRegionMapDimensions(int width, int height) {
     this->regionMapDimensions = QSize(width, height);
 }
 
+void PorymapConfig::setTheme(QString theme) {
+    this->theme = theme;
+}
+
 QString PorymapConfig::getRecentProject() {
     return this->recentProject;
 }
@@ -285,7 +302,6 @@ QMap<QString, QByteArray> PorymapConfig::getGeometry() {
     geometry.insert("window_geometry", this->windowGeometry);
     geometry.insert("window_state", this->windowState);
     geometry.insert("map_splitter_state", this->mapSplitterState);
-    geometry.insert("events_splitter_state", this->eventsSlpitterState);
     geometry.insert("main_splitter_state", this->mainSplitterState);
 
     return geometry;
@@ -307,17 +323,27 @@ bool PorymapConfig::getShowCursorTile() {
     return this->showCursorTile;
 }
 
+bool PorymapConfig::getMonitorFiles() {
+    return this->monitorFiles;
+}
+
 QSize PorymapConfig::getRegionMapDimensions() {
     return this->regionMapDimensions;
 }
 
+QString PorymapConfig::getTheme() {
+    return this->theme;
+}
+
 const QMap<BaseGameVersion, QString> baseGameVersionMap = {
     {BaseGameVersion::pokeruby, "pokeruby"},
+    {BaseGameVersion::pokefirered, "pokefirered"},
     {BaseGameVersion::pokeemerald, "pokeemerald"},
 };
 
 const QMap<QString, BaseGameVersion> baseGameVersionReverseMap = {
     {"pokeruby", BaseGameVersion::pokeruby},
+    {"pokefirered", BaseGameVersion::pokefirered},
     {"pokeemerald", BaseGameVersion::pokeemerald},
 };
 
@@ -335,16 +361,117 @@ void ProjectConfig::parseConfigKeyValue(QString key, QString value) {
             this->baseGameVersion = baseGameVersionReverseMap.value(baseGameVersion);
         } else {
             this->baseGameVersion = BaseGameVersion::pokeemerald;
-            logWarn(QString("Invalid config value for base_game_version: '%1'. Must be 'pokeruby' or 'pokeemerald'.").arg(value));
+            logWarn(QString("Invalid config value for base_game_version: '%1'. Must be 'pokeruby', 'pokefirered' or 'pokeemerald'.").arg(value));
+        }
+    } else if (key == "use_encounter_json") {
+        bool ok;
+        this->useEncounterJson = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for use_encounter_json: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "use_poryscript") {
+        bool ok;
+        this->usePoryScript = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for use_poryscript: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "use_custom_border_size") {
+        bool ok;
+        this->useCustomBorderSize = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for use_custom_border_size: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "enable_event_weather_trigger") {
+        bool ok;
+        this->enableEventWeatherTrigger = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for enable_event_weather_trigger: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "enable_event_secret_base") {
+        bool ok;
+        this->enableEventSecretBase = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for enable_event_secret_base: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "enable_hidden_item_quantity") {
+        bool ok;
+        this->enableHiddenItemQuantity = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for enable_hidden_item_quantity: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "enable_hidden_item_requires_itemfinder") {
+        bool ok;
+        this->enableHiddenItemRequiresItemfinder = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for enable_hidden_item_requires_itemfinder: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "enable_heal_location_respawn_data") {
+        bool ok;
+        this->enableHealLocationRespawnData = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for enable_heal_location_respawn_data: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "enable_object_event_in_connection") {
+        bool ok;
+        this->enableObjectEventInConnection = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for enable_object_event_in_connection: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "enable_floor_number") {
+        bool ok;
+        this->enableFloorNumber = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for enable_floor_number: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "enable_triple_layer_metatiles") {
+        bool ok;
+        this->enableTripleLayerMetatiles = value.toInt(&ok);
+        if (!ok) {
+            logWarn(QString("Invalid config value for enable_triple_layer_metatiles: '%1'. Must be 0 or 1.").arg(value));
+        }
+    } else if (key == "custom_scripts") {
+        this->customScripts.clear();
+        QList<QString> paths = value.split(",");
+        paths.removeDuplicates();
+        for (QString script : paths) {
+            if (!script.isEmpty()) {
+                this->customScripts.append(script);
+            }
         }
     } else {
         logWarn(QString("Invalid config key found in config file %1: '%2'").arg(this->getConfigFilepath()).arg(key));
     }
+    readKeys.append(key);
+}
+
+void ProjectConfig::setUnreadKeys() {
+    // Set game-version specific defaults for any config field that wasn't read
+    bool isPokefirered = this->baseGameVersion == BaseGameVersion::pokefirered;
+    if (!readKeys.contains("use_custom_border_size")) this->useCustomBorderSize = isPokefirered;
+    if (!readKeys.contains("enable_event_weather_trigger")) this->enableEventWeatherTrigger = !isPokefirered;
+    if (!readKeys.contains("enable_event_secret_base")) this->enableEventSecretBase = !isPokefirered;
+    if (!readKeys.contains("enable_hidden_item_quantity")) this->enableHiddenItemQuantity = isPokefirered;
+    if (!readKeys.contains("enable_hidden_item_requires_itemfinder")) this->enableHiddenItemRequiresItemfinder = isPokefirered;
+    if (!readKeys.contains("enable_heal_location_respawn_data")) this->enableHealLocationRespawnData = isPokefirered;
+    if (!readKeys.contains("enable_object_event_in_connection")) this->enableObjectEventInConnection = isPokefirered;
+    if (!readKeys.contains("enable_floor_number")) this->enableFloorNumber = isPokefirered;
 }
 
 QMap<QString, QString> ProjectConfig::getKeyValueMap() {
     QMap<QString, QString> map;
     map.insert("base_game_version", baseGameVersionMap.value(this->baseGameVersion));
+    map.insert("use_encounter_json", QString::number(this->useEncounterJson));
+    map.insert("use_poryscript", QString::number(this->usePoryScript));
+    map.insert("use_custom_border_size", QString::number(this->useCustomBorderSize));
+    map.insert("enable_event_weather_trigger", QString::number(this->enableEventWeatherTrigger));
+    map.insert("enable_event_secret_base", QString::number(this->enableEventSecretBase));
+    map.insert("enable_hidden_item_quantity", QString::number(this->enableHiddenItemQuantity));
+    map.insert("enable_hidden_item_requires_itemfinder", QString::number(this->enableHiddenItemRequiresItemfinder));
+    map.insert("enable_heal_location_respawn_data", QString::number(this->enableHealLocationRespawnData));
+    map.insert("enable_object_event_in_connection", QString::number(this->enableObjectEventInConnection));
+    map.insert("enable_floor_number", QString::number(this->enableFloorNumber));
+    map.insert("enable_triple_layer_metatiles", QString::number(this->enableTripleLayerMetatiles));
+    map.insert("custom_scripts", this->customScripts.join(","));
     return map;
 }
 
@@ -362,6 +489,7 @@ void ProjectConfig::onNewConfigFileCreated() {
 
         QComboBox *baseGameVersionComboBox = new QComboBox();
         baseGameVersionComboBox->addItem("pokeruby", BaseGameVersion::pokeruby);
+        baseGameVersionComboBox->addItem("pokefirered", BaseGameVersion::pokefirered);
         baseGameVersionComboBox->addItem("pokeemerald", BaseGameVersion::pokeemerald);
         form.addRow(new QLabel("Game Version"), baseGameVersionComboBox);
 
@@ -373,10 +501,27 @@ void ProjectConfig::onNewConfigFileCreated() {
             this->baseGameVersion = static_cast<BaseGameVersion>(baseGameVersionComboBox->currentData().toInt());
         }
     }
+    bool isPokefirered = this->baseGameVersion == BaseGameVersion::pokefirered;
+    this->useCustomBorderSize = isPokefirered;
+    this->enableEventWeatherTrigger = !isPokefirered;
+    this->enableEventSecretBase = !isPokefirered;
+    this->enableHiddenItemQuantity = isPokefirered;
+    this->enableHiddenItemRequiresItemfinder = isPokefirered;
+    this->enableHealLocationRespawnData = isPokefirered;
+    this->enableObjectEventInConnection = isPokefirered;
+    this->enableFloorNumber = isPokefirered;
+    this->useEncounterJson = true;
+    this->usePoryScript = false;
+    this->enableTripleLayerMetatiles = false;
+    this->customScripts.clear();
 }
 
 void ProjectConfig::setProjectDir(QString projectDir) {
     this->projectDir = projectDir;
+}
+
+QString ProjectConfig::getProjectDir() {
+    return this->projectDir;
 }
 
 void ProjectConfig::setBaseGameVersion(BaseGameVersion baseGameVersion) {
@@ -386,4 +531,112 @@ void ProjectConfig::setBaseGameVersion(BaseGameVersion baseGameVersion) {
 
 BaseGameVersion ProjectConfig::getBaseGameVersion() {
     return this->baseGameVersion;
+}
+
+void ProjectConfig::setEncounterJsonActive(bool active) {
+    this->useEncounterJson = active;
+    this->save();
+}
+
+bool ProjectConfig::getEncounterJsonActive() {
+    return this->useEncounterJson;
+}
+
+void ProjectConfig::setUsePoryScript(bool usePoryScript) {
+    this->usePoryScript = usePoryScript;
+    this->save();
+}
+
+bool ProjectConfig::getUsePoryScript() {
+    return this->usePoryScript;
+}
+
+void ProjectConfig::setUseCustomBorderSize(bool enable) {
+    this->useCustomBorderSize = enable;
+    this->save();
+}
+
+bool ProjectConfig::getUseCustomBorderSize() {
+    return this->useCustomBorderSize;
+}
+
+void ProjectConfig::setEventWeatherTriggerEnabled(bool enable) {
+    this->enableEventWeatherTrigger = enable;
+    this->save();
+}
+
+bool ProjectConfig::getEventWeatherTriggerEnabled() {
+    return this->enableEventWeatherTrigger;
+}
+
+void ProjectConfig::setEventSecretBaseEnabled(bool enable) {
+    this->enableEventSecretBase = enable;
+    this->save();
+}
+
+bool ProjectConfig::getEventSecretBaseEnabled() {
+    return this->enableEventSecretBase;
+}
+
+void ProjectConfig::setHiddenItemQuantityEnabled(bool enable) {
+    this->enableHiddenItemQuantity = enable;
+    this->save();
+}
+
+bool ProjectConfig::getHiddenItemQuantityEnabled() {
+    return this->enableHiddenItemQuantity;
+}
+
+void ProjectConfig::setHiddenItemRequiresItemfinderEnabled(bool enable) {
+    this->enableHiddenItemRequiresItemfinder = enable;
+    this->save();
+}
+
+bool ProjectConfig::getHiddenItemRequiresItemfinderEnabled() {
+    return this->enableHiddenItemRequiresItemfinder;
+}
+
+void ProjectConfig::setHealLocationRespawnDataEnabled(bool enable) {
+    this->enableHealLocationRespawnData = enable;
+    this->save();
+}
+
+bool ProjectConfig::getHealLocationRespawnDataEnabled() {
+    return this->enableHealLocationRespawnData;
+}
+
+void ProjectConfig::setObjectEventInConnectionEnabled(bool enable) {
+    this->enableObjectEventInConnection = enable;
+    this->save();
+}
+
+bool ProjectConfig::getObjectEventInConnectionEnabled() {
+    return this->enableObjectEventInConnection;
+}
+
+void ProjectConfig::setFloorNumberEnabled(bool enable) {
+    this->enableFloorNumber = enable;
+    this->save();
+}
+
+bool ProjectConfig::getFloorNumberEnabled() {
+    return this->enableFloorNumber;
+}
+
+void ProjectConfig::setTripleLayerMetatilesEnabled(bool enable) {
+    this->enableTripleLayerMetatiles = enable;
+    this->save();
+}
+
+bool ProjectConfig::getTripleLayerMetatilesEnabled() {
+    return this->enableTripleLayerMetatiles;
+}
+
+void ProjectConfig::setCustomScripts(QList<QString> scripts) {
+    this->customScripts = scripts;
+    this->save();
+}
+
+QList<QString> ProjectConfig::getCustomScripts() {
+    return this->customScripts;
 }

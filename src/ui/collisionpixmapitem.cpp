@@ -4,13 +4,13 @@ void CollisionPixmapItem::hoverMoveEvent(QGraphicsSceneHoverEvent *event) {
     int x = static_cast<int>(event->pos().x()) / 16;
     int y = static_cast<int>(event->pos().y()) / 16;
     emit this->hoveredMapMovementPermissionChanged(x, y);
-    if (this->settings->betterCursors && this->paintingEnabled) {
+    if (this->settings->betterCursors && this->paintingMode == MapPixmapItem::PaintMode::Metatiles) {
         setCursor(this->settings->mapCursor);
     }
 }
 void CollisionPixmapItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *) {
     emit this->hoveredMapMovementPermissionCleared();
-    if (this->settings->betterCursors && this->paintingEnabled){
+    if (this->settings->betterCursors && this->paintingMode == MapPixmapItem::PaintMode::Metatiles){
         unsetCursor();
     }
 }
@@ -39,7 +39,7 @@ void CollisionPixmapItem::paint(QGraphicsSceneMouseEvent *event) {
         if (block) {
             block->collision = this->movementPermissionsSelector->getSelectedCollision();
             block->elevation = this->movementPermissionsSelector->getSelectedElevation();
-            map->_setBlock(x, y, *block);
+            map->setBlock(x, y, *block, true);
         }
         if (event->type() == QEvent::GraphicsSceneMouseRelease) {
             map->commit();

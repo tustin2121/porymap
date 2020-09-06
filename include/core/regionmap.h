@@ -76,10 +76,10 @@ public:
     const int padTop    = 2;
     const int padBottom = 3;
 
-    void init(Project*);
+    bool init(Project*);
 
-    void readBkgImgBin();
-    void readLayout();
+    bool readBkgImgBin();
+    bool readLayout();
 
     void save();
     void saveTileImages();
@@ -119,6 +119,9 @@ private:
     QString region_map_entries_path;
     QString region_map_layout_bin_path;
     QString city_map_tiles_path;
+
+    bool region_map_png_needs_saving = false;
+    bool city_map_png_needs_saving = false;
 
     int img_index_(int x, int y);
     int layout_index_(int x, int y);

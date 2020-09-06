@@ -25,11 +25,20 @@
         <file>icons/folder_map_opened.ico</file>
         <file>icons/map_edited.ico</file>
         <file>icons/map_opened.ico</file>
+        <file>icons/tall_grass.ico</file>
         <file>icons/sort_alphabet.ico</file>
         <file>icons/sort_map.ico</file>
         <file>icons/sort_number.ico</file>
         <file>icons/collapse_all.ico</file>
         <file>icons/expand_all.ico</file>
         <file>images/blank_tileset.png</file>
+        <file>icons/ui/dark_checkbox_checked_disabled.png</file>
+        <file>icons/ui/dark_checkbox_checked.png</file>
+        <file>icons/ui/dark_checkbox_unchecked_disabled.png</file>
+        <file>icons/ui/dark_checkbox_unchecked.png</file>
+        <file>icons/ui/midnight_checkbox_checked_disabled.png</file>
+        <file>icons/ui/midnight_checkbox_checked.png</file>
+        <file>icons/ui/midnight_checkbox_unchecked_disabled.png</file>
+        <file>icons/ui/midnight_checkbox_unchecked.png</file>
     </qresource>
 </RCC>
