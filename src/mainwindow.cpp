@@ -1411,13 +1411,15 @@ void MainWindow::updateSelectedObjects() {
             // trainer_type has custom values, so it has special signal logic.
             if (key == "trainer_type") {
                 combo->setEditable(false);
-                combo->addItem("NONE", "0");
-                combo->addItem("NORMAL", "1");
-                combo->addItem("SEE ALL DIRECTIONS", "3");
-                combo->addItem("BUMP TO INTERACT", "5");
-                combo->addItem("KEEP LOADED", "6");
+                combo->addItem("None", "TRAINER_TYPE_NONE");
+                combo->addItem("Normal Trainer", "TRAINER_TYPE_NORMAL");
+                combo->addItem("See All Directions", "TRAINER_TYPE_SEE_ALL_DIRECTIONS");
+                combo->addItem("Buried Trainer", "TRAINER_TYPE_BURIED");
+                combo->addItem("Bump to Interact", "TRAINER_TYPE_BUMP_TO_INTERACT");
+                combo->addItem("Keep Loaded", "TRAINER_TYPE_KEEP_LOADED");
+                combo->addItem("Trainer/Keep Loaded", "TRAINER_TYPE_NORMAL_KEEP_LOADED");
                 combo->setToolTip("The trainer type of this event object.\n"
-                                  "If it is not a trainer, use NONE. SEE ALL DIRECTIONS\n"
+                                  "If it is not a trainer, use None. Buried\n"
                                   "should only be used with a sight radius of 1.");
 
                 int index = combo->findData(value);
